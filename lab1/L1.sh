@@ -4,15 +4,15 @@ function count () {
     x=0
     SECONDS=0
     while [ $SECONDS -ne 60 ]; do
-            sudo tcpdump -c 1 host $1 >> log.txt
+            sudo tcpdump -c 50 host $1 >> log.txt
             x=$(wc -l log.txt | awk '{print $1}')
             if [ $x -eq 100 ]; then
                  echo "Packet limit!"
                  sudo iptables -A INPUT -s $1 -j DROP
-                 ((tts = 60 - $SECONDS))
+                 ((tts = 30 - $SECONDS))
                  echo "Waiting for $tts seconds"
                  sleep $tts
-                 sudo iptables -D INPUT -s $1 -j ACCEPT
+                 sudo iptables -D INPUT -s $1 -j DROP
                  return 
             fi    
     done
@@ -39,5 +39,6 @@ done
 #./L1.sh 93.184.220.29
 #./L1.sh 192.168.1.127
 #./L1.sh 217.20.147.1
+#./L1.sh 91.198.174.192 wikipedia.org
 
 
