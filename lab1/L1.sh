@@ -6,10 +6,10 @@ function count () {
     while [ $SECONDS -ne 60 ]; do
             sudo tcpdump -c 50 host $1 >> log.txt
             x=$(wc -l log.txt | awk '{print $1}')
-            if [ $x -eq 100 ]; then
+            if [[ $x -eq 100 ]]; then
                  echo "Packet limit!"
                  sudo iptables -A INPUT -s $1 -j DROP
-                 ((tts = 30 - $SECONDS))
+                 ((tts = 60 - $SECONDS))
                  echo "Waiting for $tts seconds"
                  sleep $tts
                  sudo iptables -D INPUT -s $1 -j DROP
@@ -35,10 +35,7 @@ while [ 1 ]; do
     count $1
 done
 
-#Examples:
-#./L1.sh 93.184.220.29
-#./L1.sh 192.168.1.127
-#./L1.sh 217.20.147.1
-#./L1.sh 91.198.174.192 wikipedia.org
+#Example:
+#./L1.sh 91.198.174.192 (wikipedia.org)
 
 
