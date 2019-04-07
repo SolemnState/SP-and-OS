@@ -26,21 +26,21 @@ Args_t* init(Args_t* res)
     return res;
 }
 
-void* initializeTest(void* args)
+
+Args_t initialize(Args_t args)
 {
-    Args_t* arg= (Args_t*) args;
-    arg->size=SIZE;
-    arg->matrix=(int**)malloc(arg->size*sizeof(int*));
-    for (int i=0;i<arg->size;i++)
+    args.size=SIZE;
+    args.matrix=(int**)malloc(args.size*sizeof(int*));
+    for (int i=0;i<args.size;i++)
     {
-        arg->matrix[i]=(int*)malloc(arg->size*sizeof(int));
-        for (int j=0;j<arg->size;j++)
+        args.matrix[i]=(int*)malloc(args.size*sizeof(int));
+        for (int j=0;j<args.size;j++)
         {
-            arg->matrix[i][j]=rand()%10;
+            args.matrix[i][j]=rand()%10;
         }
     }
     printf("\n");
-    return EXIT_SUCCESS;
+    return args;
 }
 
 void freeMemory(Args_t M)
@@ -62,8 +62,12 @@ void printMatrix(Args_t M)
     }
 }
 
-Args_t* mulMatrix(Args_t M1, Args_t M2, Args_t* result)
+void* mulMatrix(void* args)
 {
+    Args_t* arg= (Args_t*) args;
+    Args_t M1 = arg[0];
+    Args_t M2 = arg[1];
+    Args_t* result = &arg[2];
     for (int i=0;i<M1.size;i++)
     {
         for (int j=0;j<M1.size;j++)
@@ -74,7 +78,7 @@ Args_t* mulMatrix(Args_t M1, Args_t M2, Args_t* result)
             }
         }
     }
-    return result;
+    return EXIT_SUCCESS;
 }
 
 Args_t zeroing(Args_t M)
@@ -105,12 +109,7 @@ Args_t* calculation(Args_t* array,pthread_t* threads,int n,Args_t* Result)
 {
     for (int i=0;i<n;i++)
     {
-        int status=pthread_create(&threads[i],NULL,initializeTest,(void*) &array[i]);
-        if (status!=0){
-        printf("Error! Can't create thread");
-        exit(EXIT_FAILURE);
-        }
-        status = pthread_join(threads[i], NULL);
+        array[i]=initialize(array[i]);
         printMatrix(array[i]);
     }
     Args_t* temp=(Args_t*)malloc(sizeof(Args_t));
@@ -119,12 +118,26 @@ Args_t* calculation(Args_t* array,pthread_t* threads,int n,Args_t* Result)
     for (int i=0;i<n-1;i++)
     {  
             if (i==0)
-                Result=mulMatrix(array[i],array[i+1],Result);  
+            {
+                Args_t arr[3]={array[i],array[i+1],*Result};
+                int status=pthread_create(&threads[i],NULL,mulMatrix,(void*) &arr);
+                if (status!=0){
+                    printf("Error! Can't create thread");
+                    exit(EXIT_FAILURE);
+                    }
+                status = pthread_join(threads[i], NULL);
+            } 
             else 
             {
                 temp=makeEqual(temp,Result);
                 *Result=zeroing(*Result);
-                Result=mulMatrix(*temp,array[i+1],Result);
+                Args_t arr[3]={*temp,array[i+1],*Result};
+                int status=pthread_create(&threads[i],NULL,mulMatrix,(void*) &arr);
+                if (status!=0){
+                    printf("Error! Can't create thread");
+                    exit(EXIT_FAILURE);
+                    }
+                status = pthread_join(threads[i], NULL);
             } 
     }
     freeMemory(*temp);
