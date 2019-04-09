@@ -102,28 +102,27 @@ void calculation(Args_t* array,pthread_t* threads,int n,Args_t* Result)
     initialize(temp,'z');
     for (int i=0;i<n;i++)
     {  
+            Args_t arr[3];
             if (i==0)
             {
-                Args_t arr[3]={array[i],array[i+1],*Result};
-                int status=pthread_create(&threads[i],NULL,mulMatrix,(void*) &arr);
-                if (status!=0){
-                    printf("Error! Can't create thread");
-                    exit(EXIT_FAILURE);
-                    }
-                status = pthread_join(threads[i], NULL);
-            } 
+                arr[0]=array[i];
+                arr[1]=array[i+1];
+                arr[2]=*Result;
+            }
             else 
             {
                 makeEqual(temp,Result);
                 zeroing(Result);
-                Args_t arr[3]={*temp,array[i+1],*Result};
+                arr[0]=*temp;
+                arr[1]=array[i+1];
+                arr[2]=*Result;
+            }
                 int status=pthread_create(&threads[i],NULL,mulMatrix,(void*) &arr);
                 if (status!=0){
                     printf("Error! Can't create thread");
                     exit(EXIT_FAILURE);
                     }
                 status = pthread_join(threads[i], NULL);
-            } 
     }
     freeMemory(*temp);
     free(temp);
