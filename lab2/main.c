@@ -2,15 +2,20 @@
 #include <pthread.h>
 #include <stdlib.h>
 #include <malloc.h>
-#include <time.h>
-
+#include <semaphore.h>
 int SIZE;
-
 typedef struct Args_tag {
     int** matrix;
     int size;
 } Args_t;
 
+typedef struct Args_to_thread {
+    Args_t array[3];
+    int threadsCount;
+    int startRow;
+    int endRow;
+    int thread_n;
+} To_Thread_t;
 
 void initialize(Args_t* args,char flag)
 {
@@ -22,7 +27,7 @@ void initialize(Args_t* args,char flag)
         for (int j=0;j<args->size;j++)
         {
             if (flag=='r')
-                args->matrix[i][j]=rand()%10;
+                args->matrix[i][j]=rand()%3;
             else if (flag=='z')
                 args->matrix[i][j]=0;
         }
@@ -68,64 +73,80 @@ void* mulMatrix(void* args)
     return EXIT_SUCCESS;
 }
 
-void zeroing(Args_t* M)
+void* multiply(void* args);
+void mulThreads(To_Thread_t* arg)
 {
-    for (int i=0;i<SIZE;i++)
+     if (SIZE<arg->threadsCount)
+        arg->threadsCount=SIZE;
+    int count=SIZE/arg->threadsCount; 
+    int additional = SIZE % arg->threadsCount;
+    pthread_t* threads=(pthread_t*)malloc((arg->threadsCount)*sizeof(pthread_t));
+    int start=0;
+    arg->thread_n=0;
+    sem_t* sem;
+    pthread_mutex_t mutex;
+    for (int i=0;i<arg->threadsCount;i++)
     {
-        for (int j=0;j<SIZE;j++)
-        {
-            M->matrix[i][j]=0;
-        }
+        arg->thread_n++;
+        int cnt=((i == 0) ? count + additional : count);
+        arg->startRow=start;
+        arg->endRow=start+cnt-1;
+        start+=cnt;
+        int status=pthread_create(&threads[i],NULL,multiply,(void*) arg);
+        if (status!=0)
+            printf("Error creating thread! \n");
+       pthread_yield();
     }
+    for(int i = 0; i < arg->threadsCount; i++)
+        pthread_join(threads[i],NULL); 
+    
+    free(threads);
 }
 
-void  makeEqual(Args_t* left, Args_t* right)
+void* multiply(void* args)
 {
-    for (int i=0;i<SIZE;i++)
+    To_Thread_t* arg=(To_Thread_t*) args;
+    Args_t M1 = arg->array[0];
+    Args_t M2 = arg->array[1];
+    Args_t* result = &arg->array[2];
+    for(int row = arg->startRow; row <= arg->endRow; row++)
     {
-        for (int j=0;j<SIZE;j++)
+        for(int col = 0; col < SIZE; col++)
         {
-            left->matrix[i][j]=right->matrix[i][j];
-        }
-    }
+            for (int k=0;k<SIZE;k++)
+            {
+                result->matrix[row][col]+=M1.matrix[row][k]*M2.matrix[k][col];
+            }
+        }   
+    }    
 }
 
-void calculation(Args_t* array,pthread_t* threads,int n,Args_t* Result)
+void calculation(Args_t* array,Args_t* Result)
 {
-    for (int i=0;i<n+1;i++)
+    for (int i=0;i<2;i++)
     {
         initialize(&array[i],'r');
         printMatrix(array[i]);
-    }
-    Args_t* temp=(Args_t*)malloc(sizeof(Args_t));
-    temp->size=SIZE;
-    initialize(temp,'z');
-    for (int i=0;i<n;i++)
-    {  
+    } 
             Args_t arr[3];
-            if (i==0)
+            arr[0]=array[0];
+            arr[1]=array[1];
+            arr[2]=*Result;
+            mulMatrix((void*) arr);
+}
+
+void checkMatrices(Args_t* Res1,Args_t* Res2)
+{
+    for (int i=0;i<SIZE;i++)
+        for(int j = 0; j < SIZE; j++)
+        {  
+            if (Res1->matrix[i][j]!=Res2->matrix[i][j])
             {
-                arr[0]=array[i];
-                arr[1]=array[i+1];
-                arr[2]=*Result;
+                printf("Matrices are not equal! \n");
+                return;
             }
-            else 
-            {
-                makeEqual(temp,Result);
-                zeroing(Result);
-                arr[0]=*temp;
-                arr[1]=array[i+1];
-                arr[2]=*Result;
-            }
-                int status=pthread_create(&threads[i],NULL,mulMatrix,(void*) &arr);
-                if (status!=0){
-                    printf("Error! Can't create thread");
-                    exit(EXIT_FAILURE);
-                    }
-                status = pthread_join(threads[i], NULL);
-    }
-    freeMemory(*temp);
-    free(temp);
+        }
+    printf("Matrices are equal! \n");
 }
 
 int main(int argc,char* argv[])
@@ -138,28 +159,42 @@ int main(int argc,char* argv[])
     SIZE=size;
     printf("Enter number of threads (1 or more): ");
     scanf("%d", &n);
-    if (n<1)
+    if (n<2)
     {
-        printf("Number of threads must be above zero!\n");
+        printf("Number of threads must be more than one!\n");
         exit(EXIT_FAILURE);
     }
 
-    Args_t* array=(Args_t*)malloc((n+1)*sizeof(Args_t));
+    Args_t* array=(Args_t*)malloc((2)*sizeof(Args_t));
     Args_t* Result=(Args_t*)malloc(sizeof(Args_t));
     Result->size=SIZE;
     initialize(Result,'z');
-    pthread_t* threads=(pthread_t*)malloc(n*sizeof(pthread_t));
-    calculation(array,threads,n,Result);
-    printf("\nResult: \n");
+    calculation(array,Result);
+    printf("\nResult (1 thread): \n");
     printMatrix(*Result);
 
-    for (int i=0;i<n;i++)
+    Args_t* Result_MT=(Args_t*)malloc(sizeof(Args_t));
+    Result_MT->size=SIZE;
+    initialize(Result_MT,'z');
+    To_Thread_t* args=(To_Thread_t*)malloc(sizeof(To_Thread_t));
+    args->array[0]=array[0];
+    args->array[1]=array[1];
+    args->array[2]=*Result_MT;
+    args->threadsCount=n;
+    mulThreads(args);
+    printf("\nResult (%d threads): \n",n);
+    printMatrix(args->array[2]);
+
+    checkMatrices(Result,Result_MT);
+    for (int i=0;i<2;i++)
     {
         freeMemory(array[i]);
     }
+    free(args);
     free(array);
-    free(threads);
     freeMemory(*Result);
     free(Result);
+    freeMemory(*Result_MT);
+    free(Result_MT);
     return 0;
 }
