@@ -5,5 +5,4 @@ with open('file.txt','r') as file:
     file.close()
     f=open('file.txt','w')
     f.writelines(new_lines)
-    print(file)
     f.close()
