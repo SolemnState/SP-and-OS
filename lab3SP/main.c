@@ -9,7 +9,7 @@ int M;
 
 void* handle_sigalrm (int sig)
 {
-    printf("Handled SIGALRM, begin Proc2\n");
+    printf("Handled SIGALRM, waking up init process\n");
 }
 
 int deleteLines(char* fileName)
@@ -42,8 +42,38 @@ int deleteLines(char* fileName)
 
 }
 
+void numberLines()
+{
+    FILE* file=fopen("file.txt","r");
+    FILE* temp=fopen("temp.txt","w");
+    int lineCounter=1;
+    while (! feof(file))
+    {
+        if (fgetc(file) == '\n')
+            lineCounter++;
+    }
+    fclose(file);
+    file=fopen("file.txt","r");
+    char str[256];
+    for ( int i = 1; i <= lineCounter-1; i++)
+        {
+            strcpy(str, "\0");
+            fgets(str, 256, file);
+            fprintf(temp, "%d. %s",i, str);
+        }
+    fclose(file);
+    fclose(temp);
+    remove("file.txt"); 
+    rename("temp.txt", "file.txt"); 
+}
+
 int main(int argc,char* argv[])
 {
+    struct sigaction SA;
+    SA.sa_handler=handle_sigalrm;
+    sigaction(SIGALRM,&SA,0);
+    int parent=getpid();
+    printf("Parent: %d\n",getpid());
     if (argc==0)
     {
         printf("Not enough arguments!\n");
@@ -55,44 +85,54 @@ int main(int argc,char* argv[])
     {
         printf("CAn't delete negative number of lines! \n");
         exit(EXIT_FAILURE);
-    }
-    
-    int pid2,pid3;
-    int* stat=(int*)malloc(sizeof(int));
-    pid2=fork();
+    }    
+    pid_t pid2=fork();
     if (pid2==0)
     {
-        char *pythonIntrepreter="python3";
+        printf("Process 2(numbering lines)\n");
+        numberLines();
+        kill(parent,SIGALRM);
+        exit(0);
+        /*char *pythonIntrepreter="python3";
         char *calledPython="./number.py";
         char *pythonArgs[]={pythonIntrepreter,calledPython,NULL};
-        execvp(pythonIntrepreter,pythonArgs);
+        signal(SIGALRM,handle_sigalrm);
+        execvp(pythonIntrepreter,pythonArgs);*/
     }
-    wait(pid2);
-    pid3=fork();
-    signal(SIGALRM,handle_sigalrm);
+    pause();
+    pid_t pid3=fork();
     if (pid3==0)
     {
-        alarm(1);
-        pause();
+        printf("Process 3(Deleting lines from file)\n");
         if (deleteLines(argv[0])==-1)
+        {
             printf("Error! Not enough lines in file.\n");
+            exit(EXIT_FAILURE);
+        }
+        exit(EXIT_SUCCESS);
     }
     else
     {
-        wait(pid3);
-        printf("INIT waiting is done\n");
-        printf("Reading from file:\n");
-        FILE* file=fopen("file.txt","r");
-        char* str[256];
-        while (!feof(file))
+        int status;
+        waitpid(pid3,&status,0);
+        if (status==0)
         {
-            strcpy(str, "\0");
-            fgets(str, 256, file);
-            printf("%s",str);
+            printf("Init process(Reading changed file)\n");
+            FILE* file=fopen("file.txt","r");
+            char* str[256];
+            while (!feof(file))
+                {
+                    strcpy(str, "\0");
+                    fgets(str, 256, file);
+                    printf("%s",str);
+                }
+                fclose(file);
+         }
+        else
+        {
+            printf("Process terminated with error\n");
+            return EXIT_FAILURE;
         }
-        
-        fclose(file);
     }
-    free(stat);
     return EXIT_SUCCESS;
 }
