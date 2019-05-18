@@ -69,6 +69,8 @@ void numberLines()
 
 int main(int argc,char* argv[])
 {
+    sigset_t block_mask;
+    sigemptyset(&block_mask);
     struct sigaction SA;
     SA.sa_handler=handle_sigalrm;
     sigaction(SIGALRM,&SA,0);
@@ -99,7 +101,7 @@ int main(int argc,char* argv[])
         signal(SIGALRM,handle_sigalrm);
         execvp(pythonIntrepreter,pythonArgs);*/
     }
-    pause();
+    sigsuspend(&block_mask);
     pid_t pid3=fork();
     if (pid3==0)
     {
