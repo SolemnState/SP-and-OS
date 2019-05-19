@@ -5,7 +5,6 @@
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
-#define BUFFER_SIZE 4096
 
 int main(int argc, char *argv[])
 {
@@ -16,13 +15,17 @@ int main(int argc, char *argv[])
     }
     int fd_from;
     int out_fd;
-    char buffer[BUFFER_SIZE];
+    char* buffer;
     int permission;
     ssize_t nread;
+    struct stat st;
     errno=0;
     fd_from=open(argv[1],O_RDONLY);
     if (fd_from<0)
         perror("Problem in opening the file");
+    stat(fd_from,&st);
+    printf("Size of file: %d \n",st.st_size);
+    buffer=(char*)malloc(st.st_size*(sizeof(char)));
     size_t size=strlen(argv[3]);
     if (size==3)
         permission=S_IRWXU;
@@ -50,6 +53,7 @@ int main(int argc, char *argv[])
         } while (nread>0);
         
     }
+    free(buffer);
     close(fd_from);
     close(out_fd);
     pid_t pid = fork();
@@ -62,6 +66,5 @@ int main(int argc, char *argv[])
         execvp(path,Args);
     }
     wait(&pid);
-
     return 0;
 }
