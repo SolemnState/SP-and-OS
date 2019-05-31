@@ -10,7 +10,7 @@ int main(int argc, char *argv[])
 {
     if (argc != 4 )
     {
-        printf("Usage: \n");
+        printf("Usage: ./copyFile <File> <Path with new file name> <Permission> \n");
         return EXIT_FAILURE;
     }
     int fd_from;
@@ -24,7 +24,6 @@ int main(int argc, char *argv[])
     if (fd_from<0)
         perror("Problem in opening the file");
     stat(fd_from,&st);
-    printf("Size of file: %d \n",st.st_size);
     buffer=(char*)malloc(st.st_size*(sizeof(char)));
     size_t size=strlen(argv[3]);
     if (size==3)
@@ -37,7 +36,7 @@ int main(int argc, char *argv[])
     }
     out_fd=open(argv[2],O_CREAT|O_RDWR,permission);
     if (out_fd<0)
-        perror("Problem in opening the file");
+        goto error;
     while (nread = read(fd_from, buffer, sizeof buffer), nread > 0)
     {
         char* out_ptr=buffer;
@@ -49,6 +48,10 @@ int main(int argc, char *argv[])
             {
                 nread -= nwritten;
                 out_ptr += nwritten;
+            }
+            else if (errno != EINTR)
+            {
+                goto error;
             }
         } while (nread>0);
         
@@ -62,9 +65,17 @@ int main(int argc, char *argv[])
         printf("ls command after copy: \n"); 
         char *path="/bin/ls";
         char *parameter="-l";
-        char *Args[]={path,parameter,NULL};
+        char *Args[]={path,parameter,"/home/lynx/test_fs",NULL};
         execvp(path,Args);
     }
     wait(&pid);
     return 0;
+
+    error:
+        perror("Problem in opening the output file");
+        close(fd_from);
+        if (out_fd>1)
+            close(out_fd);
+    return 1;
+
 }
